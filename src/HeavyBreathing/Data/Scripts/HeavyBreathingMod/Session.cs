@@ -37,10 +37,12 @@ namespace EvilElectricCorpMod
         private static readonly float Consumption = 0.063f;
         private static readonly float OxygenBottleCapacity = 100 * Multiplier;
 
-        private DefinitionModifier _modifier = new DefinitionModifier();
+        private DefinitionModifier _modifier;
 
         public override void LoadData()
         {
+            _modifier = new DefinitionModifier();
+
             MyDefinitionManager definitions = MyDefinitionManager.Static;
             foreach (var definition in definitions.GetDefinitionsOfType<MyCharacterDefinition>())
             {
@@ -68,6 +70,7 @@ namespace EvilElectricCorpMod
         protected override void UnloadData()
         {
             _modifier.UnsetAll();
+            _modifier = null;
         }
     }
 }
