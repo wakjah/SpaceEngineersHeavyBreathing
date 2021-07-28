@@ -1,8 +1,34 @@
 ﻿using Sandbox.Definitions;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using VRage.Game;
 using VRage.Game.Components;
 
 namespace EvilElectricCorpMod
 {
+    class DefinitionModifier
+    {
+        private delegate void Callable();
+
+        private List<Callable> _undoCommands = new List<Callable>();
+
+        public void Set<T, U>(T definition, Func<T, U> getter, Action<T, U> setter, U value)
+        {
+            U originalValue = getter(definition);
+            setter(definition, value);
+            _undoCommands.Add(() => setter(definition, originalValue));
+        }
+
+        public void UnsetAll()
+        {
+            foreach (var command in _undoCommands)
+            {
+                command();
+            }
+        }
+    }
+
     [MySessionComponentDescriptor(MyUpdateOrder.NoUpdate)]
     public class Session : MySessionComponentBase
     {
@@ -11,19 +37,21 @@ namespace EvilElectricCorpMod
         private static readonly float Consumption = 0.063f;
         private static readonly float OxygenBottleCapacity = 100 * Multiplier;
 
-        public override void BeforeStart()
+        private DefinitionModifier _modifier = new DefinitionModifier();
+
+        public override void LoadData()
         {
             MyDefinitionManager definitions = MyDefinitionManager.Static;
             foreach (var definition in definitions.GetDefinitionsOfType<MyCharacterDefinition>())
             {
-                definition.OxygenConsumption = Consumption;
-                definition.OxygenConsumptionMultiplier = Multiplier;
+                _modifier.Set(definition, d => d.OxygenConsumption, (d, v) => d.OxygenConsumption = v, Consumption);
+                _modifier.Set(definition, d => d.OxygenConsumptionMultiplier, (d, v) => d.OxygenConsumptionMultiplier = v, Multiplier);
 
                 foreach (var storage in definition.SuitResourceStorage)
                 {
                     if (storage.Id.SubtypeId == "Oxygen")
                     {
-                        storage.MaxCapacity = StorageCapacity;
+                        _modifier.Set(storage, d => d.MaxCapacity, (d, v) => d.MaxCapacity = v, StorageCapacity);
                     }
                 }
             }
@@ -32,9 +60,14 @@ namespace EvilElectricCorpMod
             {
                 if (definition.StoredGasId.SubtypeName == "Oxygen")
                 {
-                    definition.Capacity = OxygenBottleCapacity;
+                    _modifier.Set(definition, d => d.Capacity, (d, v) => d.Capacity = v, OxygenBottleCapacity);
                 }
             }
+        }
+
+        protected override void UnloadData()
+        {
+            _modifier.UnsetAll();
         }
     }
 }
